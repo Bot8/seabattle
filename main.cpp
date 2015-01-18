@@ -6,6 +6,25 @@
 
 using namespace std;
 
+enum e_directions {
+    D_VERTIVAL = 0,
+    D_HORIZONTAL = 1,
+    D_FORWARD = 1,
+    D_BACKWARD = -1
+};
+
+enum e_cell {
+    CL_NEW=-3,
+    CL_MISS,
+    CL_DEAD,
+    CL_EMPTY=0,
+};
+
+enum e_buttleground_states {
+    BG_SELECTION = 0,
+    BG_SHOTING = 1,
+};
+
 void printCell (short int cellState, bool selected = false) {
     if(selected==true) {
         cout << "[";
@@ -13,17 +32,20 @@ void printCell (short int cellState, bool selected = false) {
         cout << " ";
     }
     switch(cellState){
-        case 0:
+        case CL_EMPTY:
             cout << " ";
             break;
-        case 1:
-            cout << "#";
+        case CL_NEW:
+            cout << "0";
             break;
-        case 2:
+        case CL_DEAD:
             cout << "x";
             break;
-        case 3:
+        case CL_MISS:
             cout << "*";
+            break;
+        default:
+            cout << "#";
             break;
     }
     if(selected==true) {
@@ -33,7 +55,7 @@ void printCell (short int cellState, bool selected = false) {
     }
 }
 
-void printButtleground(short ** battleGround, int battlegroundSize, int pointer[]){
+void printButtleground(short ** battleGround, int battlegroundSize, int pointer[], int * newShip, short state = BG_SHOTING){
 
     bool selected;
 
@@ -45,41 +67,83 @@ void printButtleground(short ** battleGround, int battlegroundSize, int pointer[
 
     cout << endl;
 
-
     for(int i = 0; i<battlegroundSize; i++) {
         cout << setw(2) << i+1 << " ";
         for(int j = 0; j<battlegroundSize; j++) {
-            selected = ((pointer[0]==i) && (pointer[1]==j)) ? true : false;
+            if((pointer[0]==i) && (pointer[1]==j)) {
+                selected = true;
+            } else if(state == BG_SELECTION) {
+
+                if((newShip[1]==D_HORIZONTAL) && (pointer[0] == i) && (j>=pointer[1] && j<pointer[1]+newShip[0])) {
+                    selected = true;
+                } else if(newShip[1]==D_VERTIVAL && (pointer[1] == j) && (i>=pointer[0] && i<pointer[0]+newShip[0])) {
+                    selected = true;
+                } else {
+                    selected = false;
+                }
+
+            } else {
+                selected = false;
+            }
             printCell(battleGround[i][j], selected);
         }
         cout << endl;
     }
 }
 
-enum e_action {A_UP=119, A_DOWN=115, A_LEFT=97, A_RIGHT=100, A_DO=32, A_EXIT=27};
+enum e_action {
+    A_UP=119,
+    A_DOWN=115,
+    A_LEFT=97,
+    A_RIGHT=100,
+    A_DO=32,
+    A_EXIT=27,
+    A_TURN=114,
+    A_DELETE=120
+};
 
 
-void movePointer(int action, int pointer [], int battlegroundSize) {
+
+void movePointer(int action, int pointer [], int battlegroundSize, int newShip[], short state) {
 
     int movePoint;
-    int moveDirection = 1;
+    int moveDirection = D_FORWARD;
 
     if((action == A_UP) || (action == A_DOWN )){
-        movePoint = 0;
+        movePoint = D_VERTIVAL;
     } else if((action == A_LEFT) || (action == A_RIGHT )) {
-        movePoint = 1;
+        movePoint = D_HORIZONTAL;
     }
 
     if((action==A_LEFT) || (action==A_UP)){
-        moveDirection = -1;
+        moveDirection = D_BACKWARD;
     }
 
-    pointer[movePoint] += moveDirection;
-    if(pointer[movePoint] >= battlegroundSize) {
-        pointer[movePoint] = 0;
-    } else if(pointer[movePoint]<0) {
-        pointer[movePoint] = battlegroundSize-1;
+    switch (state) {
+        case BG_SHOTING:
+            
+            pointer[movePoint] += moveDirection;
+            if(pointer[movePoint] >= battlegroundSize) {
+                pointer[movePoint] = 0;
+            } else if(pointer[movePoint]<0) {
+                pointer[movePoint] = battlegroundSize-1;
+            }
+            break;
+
+        case BG_SELECTION:
+
+            int overflow = pointer[movePoint] + moveDirection;
+
+            if((newShip[1]==movePoint) && ((overflow + newShip[0]) > battlegroundSize)) {
+                return;
+            }else if(overflow<0 || overflow >= battlegroundSize){
+                return;
+            } else {
+                pointer[movePoint] += moveDirection;
+            }
+            break;
     }
+
 }
 
 
@@ -97,6 +161,8 @@ int main(){
 
     int pointer[2] = {0, 0};
 
+    int newShip[2] = {3, D_HORIZONTAL};
+
     /*
         init battleground
      */
@@ -110,24 +176,37 @@ int main(){
         Set random field for battleground
      */
 
-    for(int i = 0; i<battlegroundSize; i++) {
+/*    for(int i = 0; i<battlegroundSize; i++) {
         for(int j = 0; j<battlegroundSize; j++) {
             battleGround[i][j] = rand()%4;
         }
-    }
-
+    }*/
 
 
     int action;
+    e_buttleground_states state = BG_SELECTION;
 
     do {
+
         system("clear");
 
-        printButtleground(battleGround, battlegroundSize, pointer);
+        printButtleground(battleGround, battlegroundSize, pointer, newShip, state);
+
+        cout << endl << "action [" << action << "]" << endl;
+        cout << endl << "new ship [" << newShip[0] << ":"<< newShip[1] << "]" << endl;
 
         cout << endl << "pointer [" << pointer[0]+1 << ":" << pointer[1]+1 << "]" << endl;
 
-        cout << endl << "Controls:" << endl << "w, a, s, d - to movie" << endl <<"space - to action" << endl <<  "esc - to exit" << endl;
+        cout << endl << "Controls:";
+
+        cout << endl << "w, a, s, d - to movie";
+        if(state==BG_SELECTION) {
+            cout << endl << "r - to turn ship";
+        }
+        cout << endl << "space - to action";
+        cout << endl << "esc - to exit";
+
+        cout << endl;
 
         action = mygetch();
 
@@ -136,12 +215,17 @@ int main(){
             case A_DOWN:
             case A_LEFT:
             case A_RIGHT:
-                movePointer(action, pointer, battlegroundSize);
+                movePointer(action, pointer, battlegroundSize, newShip, state);
+                break;
+            case A_DO:
+
+                break;
+            case A_TURN:
+                newShip[1] = (newShip[1]==D_HORIZONTAL) ? D_VERTIVAL : D_HORIZONTAL;
                 break;
         }
 
     } while (action!=A_EXIT);
-
 
     cout << endl << "Press any key to exit..." << endl;
 
