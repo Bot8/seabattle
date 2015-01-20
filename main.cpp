@@ -14,10 +14,10 @@ enum e_directions {
 };
 
 enum e_cell {
-    CL_NEW=-3,
+    CL_NEW=-4,
     CL_MISS,
     CL_DEAD,
-    CL_EMPTY=0,
+    CL_EMPTY,
 };
 
 enum e_game_stage {
@@ -36,17 +36,24 @@ enum e_action {
     A_DELETE=120
 };
 
-struct fleet {
-    int ship[10][2];
+struct s_new_ship {
+    short id;
+    short direction;
 };
 
-void printCell (short int cellstage, bool selected = false) {
+struct s_fleet {
+    int ship[10][2];
+    s_new_ship newShip;
+    int pointer[2];
+};
+
+void printCell (short int cellstate, bool selected = false) {
     if(selected==true) {
         cout << "[";
     } else {
         cout << " ";
     }
-    switch(cellstage){
+    switch(cellstate){
         case CL_EMPTY:
             cout << " ";
             break;
@@ -60,7 +67,7 @@ void printCell (short int cellstage, bool selected = false) {
             cout << "*";
             break;
         default:
-            cout << "#";
+            cout << cellstate;
             break;
     }
     if(selected==true) {
@@ -70,7 +77,7 @@ void printCell (short int cellstage, bool selected = false) {
     }
 }
 
-void printButtleground(short ** battleGround, int battlegroundSize, int pointer[], int * newShip, short stage = BG_SHOTING){
+void printButtleground(short ** battleGround, int battlegroundSize, s_fleet & Fleet, short stage = BG_SHOTING){
 
     bool selected;
 
@@ -85,13 +92,13 @@ void printButtleground(short ** battleGround, int battlegroundSize, int pointer[
     for(int i = 0; i<battlegroundSize; i++) {
         cout << setw(2) << i+1 << " ";
         for(int j = 0; j<battlegroundSize; j++) {
-            if((pointer[0]==i) && (pointer[1]==j)) {
+            if((Fleet.pointer[0]==i) && (Fleet.pointer[1]==j)) {
                 selected = true;
             } else if(stage == BG_SELECTION) {
-
-                if((newShip[1]==D_HORIZONTAL) && (pointer[0] == i) && (j>=pointer[1] && j<pointer[1]+newShip[0])) {
+                int newShipSize = Fleet.ship[Fleet.newShip.id][0];
+                if((Fleet.newShip.direction==D_HORIZONTAL) && (Fleet.pointer[0] == i) && (j>=Fleet.pointer[1] && j<Fleet.pointer[1]+newShipSize)) {
                     selected = true;
-                } else if(newShip[1]==D_VERTIVAL && (pointer[1] == j) && (i>=pointer[0] && i<pointer[0]+newShip[0])) {
+                } else if(Fleet.newShip.direction==D_VERTIVAL && (Fleet.pointer[1] == j) && (i>=Fleet.pointer[0] && i<Fleet.pointer[0]+newShipSize)) {
                     selected = true;
                 } else {
                     selected = false;
@@ -139,28 +146,31 @@ void movePointer(int pointer [], int action, int battlegroundSize) {
 
 }
 
-void moveShip(int pointer[], int action, int battlegroundSize, int newShip[]) {
+void moveShip(s_fleet & Fleet, int action, int battlegroundSize) {
 
     int movePoint;
     int moveDirection;
 
     checkDirection(action, movePoint, moveDirection);
 
-    int overflow = pointer[movePoint] + moveDirection;
+    int overflow = Fleet.pointer[movePoint] + moveDirection;
 
-    if((newShip[1]==movePoint) && ((overflow + newShip[0]) > battlegroundSize)) {
+    int newShipSize = Fleet.ship[Fleet.newShip.id][0];
+
+
+    if((Fleet.newShip.direction==movePoint) && ((overflow + newShipSize) > battlegroundSize)) {
         return;
     } else if(overflow<0 || overflow >= battlegroundSize) {
         return;
     } else {
-        pointer[movePoint] += moveDirection;
+        Fleet.pointer[movePoint] += moveDirection;
     }
 
 }
 
-void turnShip(int pointer[], int battlegroundSize, int newShip[]){
+void turnShip(s_fleet & Fleet, int battlegroundSize){
     int turnTo;
-    switch(newShip[1]) {
+    switch(Fleet.newShip.direction) {
         case D_HORIZONTAL:
             turnTo = 0;
             break;
@@ -168,12 +178,15 @@ void turnShip(int pointer[], int battlegroundSize, int newShip[]){
             turnTo = 1;
             break;
     }
-    if(pointer[turnTo]+newShip[0]<=battlegroundSize) {
-        newShip[1] = (newShip[1]==D_HORIZONTAL) ? D_VERTIVAL : D_HORIZONTAL;
+
+    int newShipSize = Fleet.ship[Fleet.newShip.id][0];
+
+    if(Fleet.pointer[turnTo]+newShipSize<=battlegroundSize) {
+        Fleet.newShip.direction = (Fleet.newShip.direction==D_HORIZONTAL) ? D_VERTIVAL : D_HORIZONTAL;
     }
 }
 
-void craftFleet(int ships [10][2]){
+void craftFleet(s_fleet & Fleet, int battlegroundSize, short ** battleGround){
     int types[4][2] = {
             {1,4},
             {2,3},
@@ -182,12 +195,60 @@ void craftFleet(int ships [10][2]){
     };
     int typeIndex = 0;
     for(int i = 0; i<10; i++) {
-        ships[i][0] = types[typeIndex][0];
-        ships[i][1] = 0;
+        Fleet.ship[i][0] = types[typeIndex][0];
+        Fleet.ship[i][1] = 0;
         types[typeIndex][1]--;
         if(types[typeIndex][1] < 1) {
             typeIndex++;
         }
+    }
+
+    Fleet.newShip.id = 0;
+    Fleet.newShip.direction = D_HORIZONTAL;
+    Fleet.pointer[0] = 0;
+    Fleet.pointer[1] = 0;
+
+
+    for (int i = 0; i<battlegroundSize; i++) {
+        for (int j = 0; j<battlegroundSize; j++) {
+            battleGround[i][j] = CL_EMPTY;
+        }
+    }
+}
+
+bool changeShip(s_fleet & Fleet){
+
+    Fleet.pointer[0] = 0;
+    Fleet.pointer[1] = 0;
+
+    Fleet.newShip.id++;
+
+    if(Fleet.newShip.id>=10) {
+        return false;
+    }
+
+    return true;
+}
+
+void setShip(s_fleet & Fleet, int battlegroundSize, short ** battleGround){
+    int newShipSize = Fleet.ship[Fleet.newShip.id][0];
+    switch(Fleet.newShip.direction) {
+        case D_HORIZONTAL:
+            if(Fleet.pointer[1]+newShipSize>battlegroundSize) {
+                return;
+            }
+            for(int i = Fleet.pointer[1]; i<Fleet.pointer[1]+newShipSize; i++ ){
+                battleGround[Fleet.pointer[0]][i] = Fleet.newShip.id;
+            }
+            break;
+        case D_VERTIVAL:
+            if(Fleet.pointer[0]+newShipSize>battlegroundSize) {
+                return;
+            }
+            for(int i = Fleet.pointer[0]; i<Fleet.pointer[0]+newShipSize; i++){
+                battleGround[i][Fleet.pointer[1]] = Fleet.newShip.id;
+            }
+            break;
     }
 }
 
@@ -205,10 +266,6 @@ void inspectFleet(int ships [10][2]){
 
     int shipSize = 1;
     int countShipType = 0;
-
-//    for (int i = 0; i<10; i++) {
-//        cout << "Ship id=" << i << " size=" << ships[i][0] << " dead=" <<ships[i][1] << endl;
-//    }
 
     for (int i = 0; i<10; i++) {
         if(ships[i][0]!=shipSize) {
@@ -237,13 +294,7 @@ int main(){
 
     int battlegroundSize = 10;
 
-    int pointer[2] = {0, 0};
-
-    fleet myFleet, PCFleet;
-
-    craftFleet(myFleet.ship);
-
-    int newShip[2] = {3, D_HORIZONTAL};
+    s_fleet myFleet, PCFleet;
 
     /*
         init battleground
@@ -254,6 +305,8 @@ int main(){
         battleGround[i] = new short [battlegroundSize];
     }
 
+    craftFleet(myFleet, battlegroundSize, battleGround);
+
     int action;
     e_game_stage stage = BG_SELECTION;
 
@@ -261,13 +314,14 @@ int main(){
 
         system("clear");
 
+        printButtleground(battleGround, battlegroundSize, myFleet, stage);
         inspectFleet(myFleet.ship);
-        printButtleground(battleGround, battlegroundSize, pointer, newShip, stage);
 
         cout << endl << "action [" << action << "]" << endl;
-        cout << endl << "new ship [" << newShip[0] << ":"<< newShip[1] << "]" << endl;
+        
+        cout << endl << "new ship [" << myFleet.newShip.id << ":"<< myFleet.newShip.direction << "]" << endl;
 
-        cout << endl << "pointer [" << pointer[0]+1 << ":" << pointer[1]+1 << "]" << endl;
+        cout << endl << "pointer [" << myFleet.pointer[0]+1 << ":" << myFleet.pointer[1]+1 << "]" << endl;
 
         cout << endl << "Controls:";
 
@@ -289,15 +343,17 @@ int main(){
             case A_RIGHT:
                 switch (stage) {
                     case BG_SHOTING:
-                        movePointer(pointer, action, battlegroundSize);
+                        movePointer(myFleet.pointer, action, battlegroundSize);
                     case BG_SELECTION:
-                        moveShip(pointer, action, battlegroundSize, newShip);
+                        moveShip(myFleet, action, battlegroundSize);
                 }
                 break;
             case A_DO:
+                setShip(myFleet, battlegroundSize, battleGround);
+                changeShip(myFleet);
                 break;
             case A_TURN:
-                turnShip(pointer, battlegroundSize, newShip);
+                turnShip(myFleet, battlegroundSize);
                 break;
         }
 
