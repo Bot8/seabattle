@@ -218,38 +218,107 @@ void craftFleet(s_fleet & Fleet, int battlegroundSize, short ** battleGround){
 
 bool changeShip(s_fleet & Fleet){
 
-    Fleet.pointer[0] = 0;
-    Fleet.pointer[1] = 0;
-
     Fleet.newShip.id++;
 
     if(Fleet.newShip.id>=10) {
         return false;
     }
 
+    Fleet.pointer[0] = 0;
+    Fleet.pointer[1] = 0;
+
     return true;
 }
 
-void setShip(s_fleet & Fleet, int battlegroundSize, short ** battleGround){
+bool setShip(s_fleet & Fleet, int battlegroundSize, short ** battleGround){
     int newShipSize = Fleet.ship[Fleet.newShip.id][0];
+    int rightBoard, leftBoard, bow, feed;
     switch(Fleet.newShip.direction) {
         case D_HORIZONTAL:
+
             if(Fleet.pointer[1]+newShipSize>battlegroundSize) {
-                return;
+                return false;
             }
+
+            bow = Fleet.pointer[1]+newShipSize;
+
+            if(bow>battlegroundSize-1) {
+                bow = battlegroundSize-1;
+            }
+
+            feed = Fleet.pointer[1]-1;
+
+            if(feed<0) {
+                feed = 0;
+            }
+
+            rightBoard = Fleet.pointer[0]+1;
+
+            if(rightBoard>battlegroundSize-1) {
+                rightBoard = battlegroundSize-1;
+            }
+
+            leftBoard = Fleet.pointer[0]-1;
+
+            if(leftBoard<0) {
+                leftBoard = 0;
+            }
+
+            for(int i = leftBoard; i<=rightBoard; i++) {
+                for (int j = feed; j<=bow; j++) {
+                    if(battleGround[i][j]>CL_EMPTY) {
+                        return false;
+                    }
+                }
+            }
+
             for(int i = Fleet.pointer[1]; i<Fleet.pointer[1]+newShipSize; i++ ){
                 battleGround[Fleet.pointer[0]][i] = Fleet.newShip.id;
             }
             break;
         case D_VERTIVAL:
             if(Fleet.pointer[0]+newShipSize>battlegroundSize) {
-                return;
+                return false;
             }
+
+            bow = Fleet.pointer[0]+newShipSize;
+
+            if(bow>battlegroundSize-1) {
+                bow = battlegroundSize-1;
+            }
+
+            feed = Fleet.pointer[0]-1;
+
+            if(feed<0) {
+                feed = 0;
+            }
+
+            rightBoard = Fleet.pointer[1]+1;
+
+            if(rightBoard>battlegroundSize-1) {
+                rightBoard = battlegroundSize-1;
+            }
+
+            leftBoard = Fleet.pointer[1]-1;
+
+            if(leftBoard<0) {
+                leftBoard = 0;
+            }
+
+            for(int i = feed; i<=bow; i++) {
+                for (int j = leftBoard; j<=rightBoard; j++) {
+                    if(battleGround[i][j]>CL_EMPTY) {
+                        return false;
+                    }
+                }
+            }
+
             for(int i = Fleet.pointer[0]; i<Fleet.pointer[0]+newShipSize; i++){
                 battleGround[i][Fleet.pointer[1]] = Fleet.newShip.id;
             }
             break;
     }
+    return true;
 }
 
 void printShipType(int shipSize, int countShipType) {
@@ -293,6 +362,7 @@ int main(){
      */
 
     int battlegroundSize = 10;
+    bool settingShip;
 
     s_fleet myFleet, PCFleet;
 
@@ -349,8 +419,10 @@ int main(){
                 }
                 break;
             case A_DO:
-                setShip(myFleet, battlegroundSize, battleGround);
-                changeShip(myFleet);
+                settingShip = setShip(myFleet, battlegroundSize, battleGround);
+                if(settingShip==true) {
+                    changeShip(myFleet);
+                }
                 break;
             case A_TURN:
                 turnShip(myFleet, battlegroundSize);
