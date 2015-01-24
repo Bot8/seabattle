@@ -52,7 +52,7 @@ struct s_fleet {
     int pointer[2];
 };
 
-void printCell (short int cellstate, bool selected = false) {
+void printCell (short int cellstate, bool selected, bool fogOfWar) {
     if(selected==true) {
         cout << "[";
     } else {
@@ -72,7 +72,12 @@ void printCell (short int cellstate, bool selected = false) {
             cout << "*";
             break;
         default:
-            cout << cellstate;
+            //cout << cellstate;
+            if(fogOfWar==true) {
+                cout << " ";
+            } else {
+                cout << "#";
+            }
             break;
     }
     if(selected==true) {
@@ -82,7 +87,7 @@ void printCell (short int cellstate, bool selected = false) {
     }
 }
 
-void printButtleground(int battlegroundSize, s_fleet & Fleet, short stage = BG_SHOTING){
+void printButtleground(int battlegroundSize, s_fleet & Fleet, short stage = BG_SHOTING, bool fogOfWar = false){
     bool selected;
     cout << "  ";
     for(int j = 0; j<battlegroundSize; j++) {
@@ -106,7 +111,7 @@ void printButtleground(int battlegroundSize, s_fleet & Fleet, short stage = BG_S
             } else {
                 selected = false;
             }
-            printCell(Fleet.battleGround[i][j], selected);
+            printCell(Fleet.battleGround[i][j], selected, fogOfWar);
         }
         cout << endl;
     }
@@ -398,9 +403,31 @@ s_fleet initFleet(int battlegroundSize){
     return Fleet;
 }
 
-void printControls(e_game_stage stage, int action, s_fleet & Fleet){
+bool shot(s_fleet & Fleet) {
+    int i = Fleet.pointer[0];
+    int j = Fleet.pointer[1];
+    if(Fleet.battleGround[i][j] >= 0) {
+        int shipId = Fleet.battleGround[i][j];
+        Fleet.ship[shipId][1]++;
+        Fleet.battleGround[i][j] = CL_DEAD;
+        return true;
+    }
 
-    cout << endl << "pointer [" << Fleet.pointer[0]+1 << ":" << Fleet.pointer[1]+1 << "] " << "action [" << action << "]"  << endl;
+    switch (Fleet.battleGround[i][j]) {
+        case CL_EMPTY:
+            Fleet.battleGround[i][j] = CL_MISS;
+            break;
+        case CL_MISS:
+        case CL_DEAD:
+            break;
+    }
+
+    return false;
+}
+
+void printControls(e_game_stage stage, int action, s_fleet & myFleet, s_fleet & PCFleet){
+
+    cout << endl << "my [" << myFleet.pointer[0] << ":" << myFleet.pointer[1] << "] "<< "PC [" << PCFleet.pointer[0] << ":" << PCFleet.pointer[1] << "] " << "action [" << action << "]"  << endl;
     cout << endl << "esc - to exit";
     if(stage==BG_CONFIRM){
         cout << endl << "Ship setted. Confirm? [y/n]";
@@ -432,11 +459,11 @@ int main(){
         printButtleground(battlegroundSize, myFleet, stage);
         inspectFleet(myFleet.ship);
         if(stage == BG_SHOTING) {
-            printButtleground(battlegroundSize, PCFleet, stage);
+            printButtleground(battlegroundSize, PCFleet, stage, true);
             inspectFleet(PCFleet.ship);
         }
 
-        printControls(stage, action, myFleet);
+        printControls(stage, action, myFleet, PCFleet);
 
         action = mygetch();
 
@@ -477,7 +504,14 @@ int main(){
                 }
                 break;
             case A_DO:
-                setShip(myFleet, battlegroundSize, stage);
+                switch (stage) {
+                    case BG_SHOTING:
+                        shot(PCFleet);
+                        break;
+                    case BG_SELECTION:
+                        setShip(myFleet, battlegroundSize, stage);
+                        break;
+                }
                 break;
             case A_TURN:
                 turnShip(myFleet, battlegroundSize);
