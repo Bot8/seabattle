@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <iomanip>
+#include <string.h>
 #include "c_string.h"
 
 using namespace std;
@@ -41,6 +42,19 @@ enum e_action {
     A_NO=110
 };
 
+enum e_shooters{
+    SHOTER_PC,
+    SHOTER_HUMAN
+};
+
+enum e_shot_direction {
+     UNKNOWN = 0,
+     NORTH = 1,
+     SOUTH = 2,
+     EAST = 3,
+     WEST = 4
+};
+
 struct s_surroundings {
     short NorthSide;
     short SouthSide;
@@ -61,10 +75,19 @@ struct s_ship {
 
 struct s_fleet {
     short ** battleGround;
+    short battlegroundSize;
     s_ship * ships;
+    short shipsAllive;
     s_new_ship newShip;
     int pointer[2];
 };
+
+struct s_pc_memory {
+    short * detectPoint;
+    bool shipDetected;
+    e_shot_direction direction;
+    e_shot_direction tempDirection;
+} pcMemory;
 
 void printCell (short int cellstate, bool selected, bool fogOfWar) {
     if(selected==true) {
@@ -101,16 +124,16 @@ void printCell (short int cellstate, bool selected, bool fogOfWar) {
     }
 }
 
-void printButtleground(int battlegroundSize, s_fleet & Fleet, short stage = BG_SHOTING, bool fogOfWar = false){
+void printButtleground(s_fleet & Fleet, short stage = BG_SHOTING, bool fogOfWar = false){
     bool selected;
     cout << "  ";
-    for(int j = 0; j<battlegroundSize; j++) {
+    for(int j = 0; j<Fleet.battlegroundSize; j++) {
         cout << setw(2) << " " << j+1;
     }
     cout << endl;
-    for(int i = 0; i<battlegroundSize; i++) {
+    for(int i = 0; i<Fleet.battlegroundSize; i++) {
         cout << setw(2) << i+1 << " ";
-        for(int j = 0; j<battlegroundSize; j++) {
+        for(int j = 0; j<Fleet.battlegroundSize; j++) {
             if((Fleet.pointer[0]==i) && (Fleet.pointer[1]==j)) {
                 selected = true;
             } else if(stage == BG_SELECTION) {
@@ -145,7 +168,7 @@ void checkDirection(int action, int & movePoint, int & moveDirection) {
 }
 
 
-void movePointer(int pointer [], int action, int battlegroundSize) {
+void movePointer(int pointer [], int action, short battlegroundSize) {
     int movePoint;
     int moveDirection;
 
@@ -159,7 +182,7 @@ void movePointer(int pointer [], int action, int battlegroundSize) {
     }
 }
 
-void moveShip(s_fleet & Fleet, int action, int battlegroundSize) {
+void moveShip(s_fleet & Fleet, int action) {
     int movePoint;
     int moveDirection;
 
@@ -168,16 +191,16 @@ void moveShip(s_fleet & Fleet, int action, int battlegroundSize) {
     int overflow = Fleet.pointer[movePoint] + moveDirection;
     int newShipSize = Fleet.ships[Fleet.newShip.id].size;
 
-    if((Fleet.newShip.direction==movePoint) && ((overflow + newShipSize) > battlegroundSize)) {
+    if((Fleet.newShip.direction==movePoint) && ((overflow + newShipSize) > Fleet.battlegroundSize)) {
         return;
-    } else if(overflow<0 || overflow >= battlegroundSize) {
+    } else if(overflow<0 || overflow >= Fleet.battlegroundSize) {
         return;
     } else {
         Fleet.pointer[movePoint] += moveDirection;
     }
 }
 
-void turnShip(s_fleet & Fleet, int battlegroundSize){
+void turnShip(s_fleet & Fleet){
     int turnTo;
     int newShipSize = Fleet.ships[Fleet.newShip.id].size;
 
@@ -190,12 +213,12 @@ void turnShip(s_fleet & Fleet, int battlegroundSize){
             break;
     }
 
-    if(Fleet.pointer[turnTo]+newShipSize<=battlegroundSize) {
+    if(Fleet.pointer[turnTo]+newShipSize<=Fleet.battlegroundSize) {
         Fleet.newShip.direction = (Fleet.newShip.direction==D_HORIZONTAL) ? D_VERTIVAL : D_HORIZONTAL;
     }
 }
 
-void craftFleet(s_fleet & Fleet, int battlegroundSize){
+void craftFleet(s_fleet & Fleet){
     int types[4][2] = {
             {4,1},
             {3,2},
@@ -219,8 +242,8 @@ void craftFleet(s_fleet & Fleet, int battlegroundSize){
     Fleet.newShip.direction = D_HORIZONTAL;
     Fleet.pointer[0] = Fleet.pointer[1] = 0;
 
-    for (int i = 0; i<battlegroundSize; i++) {
-        for (int j = 0; j<battlegroundSize; j++) {
+    for (int i = 0; i<Fleet.battlegroundSize; i++) {
+        for (int j = 0; j<Fleet.battlegroundSize; j++) {
             Fleet.battleGround[i][j] = CL_EMPTY;
         }
     }
@@ -239,19 +262,19 @@ bool changeShip(s_fleet & Fleet){
     return true;
 }
 
-bool placeShipToBG(s_fleet & Fleet, int battlegroundSize){
+bool placeShipToBG(s_fleet & Fleet){
     int newShipSize = Fleet.ships[Fleet.newShip.id].size;
     s_surroundings surroundings;
     switch(Fleet.newShip.direction) {
         case D_HORIZONTAL:
-            if(Fleet.pointer[1]+newShipSize>battlegroundSize) {
+            if(Fleet.pointer[1]+newShipSize>Fleet.battlegroundSize) {
                 return false;
             }
             surroundings.SouthSide = Fleet.pointer[0]+1;
             surroundings.EastSide = Fleet.pointer[1]+newShipSize;
             break;
         case D_VERTIVAL:
-            if(Fleet.pointer[0]+newShipSize>battlegroundSize) {
+            if(Fleet.pointer[0]+newShipSize>Fleet.battlegroundSize) {
                 return false;
             }
             surroundings.SouthSide = Fleet.pointer[0]+newShipSize;
@@ -264,8 +287,8 @@ bool placeShipToBG(s_fleet & Fleet, int battlegroundSize){
         surroundings.NorthSide = 0;
     }
 
-    if(surroundings.SouthSide>battlegroundSize-1) {
-        surroundings.SouthSide = battlegroundSize-1;
+    if(surroundings.SouthSide>Fleet.battlegroundSize-1) {
+        surroundings.SouthSide = Fleet.battlegroundSize-1;
     }
 
     surroundings.WestSide = Fleet.pointer[1]-1;
@@ -273,8 +296,8 @@ bool placeShipToBG(s_fleet & Fleet, int battlegroundSize){
         surroundings.WestSide = 0;
     }
 
-    if(surroundings.EastSide>battlegroundSize-1) {
-        surroundings.EastSide = battlegroundSize-1;
+    if(surroundings.EastSide>Fleet.battlegroundSize-1) {
+        surroundings.EastSide = Fleet.battlegroundSize-1;
     }
 
     for(int i = surroundings.NorthSide; i<=surroundings.SouthSide; i++) {
@@ -303,7 +326,7 @@ bool placeShipToBG(s_fleet & Fleet, int battlegroundSize){
     return true;
 }
 
-bool setShip(s_fleet & Fleet, int battlegroundSize, e_game_stage & stage, bool autoSet = false, bool changeStageOnSuccess = true){
+bool setShip(s_fleet & Fleet, e_game_stage & stage, bool autoSet = false, bool changeStageOnSuccess = true){
     bool settingShip = false;
     bool shipSetted;
     int iterations = 0;
@@ -311,15 +334,15 @@ bool setShip(s_fleet & Fleet, int battlegroundSize, e_game_stage & stage, bool a
         while (settingShip == false){
             iterations++;
             if(iterations>100){
-                craftFleet(Fleet, battlegroundSize);
+                craftFleet(Fleet);
             }
             Fleet.newShip.direction = rand()%2;
             Fleet.pointer[0] = rand()%10;
             Fleet.pointer[1] = rand()%10;
-            settingShip = placeShipToBG(Fleet, battlegroundSize);
+            settingShip = placeShipToBG(Fleet);
         }
     } else {
-        settingShip = placeShipToBG(Fleet, battlegroundSize);
+        settingShip = placeShipToBG(Fleet);
         if(settingShip==false) {
             return true;
         }
@@ -359,10 +382,8 @@ bool inspectFleet(s_ship * ships, e_game_stage & stage){
     cout << "Totla Allive " << totalAllive << " ships" << endl;
     if(totalAllive==0) {
         stage = BG_END_GAME;
-        return false;
-    } else {
-        return true;
     }
+    return totalAllive;
 }
 
 short ** initBattleGround(int battlegroundSize){
@@ -375,8 +396,9 @@ short ** initBattleGround(int battlegroundSize){
 
 s_fleet initFleet(int battlegroundSize){
     s_fleet Fleet;
+    Fleet.battlegroundSize = battlegroundSize;
     Fleet.battleGround = initBattleGround(battlegroundSize);
-    craftFleet(Fleet, battlegroundSize);
+    craftFleet(Fleet);
     return Fleet;
 }
 
@@ -393,8 +415,9 @@ void surroundShip(s_fleet & Fleet, short shipId) {
 void destrouShipDeck(s_fleet & Fleet, short col, short row){
     short shipId = Fleet.battleGround[col][row];
     Fleet.ships[shipId].dead++;
-    if(Fleet.ships[shipId].dead ==  Fleet.ships[shipId].size){
+    if(Fleet.ships[shipId].dead == Fleet.ships[shipId].size){
        surroundShip(Fleet, shipId);
+       Fleet.shipsAllive--;
     }
     Fleet.battleGround[col][row] = CL_DEAD;
 }
@@ -417,6 +440,132 @@ bool shot(s_fleet & Fleet) {
     return false;
 }
 
+void inverseDirection(e_shot_direction & direction) {
+    switch(direction){
+        case NORTH:
+            direction = SOUTH;
+            break;
+        case SOUTH:
+            direction = NORTH;
+            break;
+        case EAST:
+            direction = WEST;
+            break;
+        case WEST:
+            direction = EAST;
+            break;
+
+    }
+}
+
+bool PCMovePointer(s_fleet & Fleet, e_shot_direction direction){
+cout << endl<< "move" <<direction;
+    short point;
+    short i, j;
+    if(direction==NORTH || direction==SOUTH) {
+        point = 0;
+    } else if(direction==EAST || direction==WEST) {
+        point = 1;
+    }
+
+    if(direction==SOUTH || direction==EAST) {
+        Fleet.pointer[point]++;
+        if(Fleet.pointer[point]>=Fleet.battlegroundSize) {
+        cout << "break on 474";
+            return false;
+        }
+    } else if(direction==NORTH || direction==WEST) {
+        Fleet.pointer[point]--;
+        if(Fleet.pointer[point]<0) {
+        cout << "break on 480";
+            return false;
+        }
+    }
+    i = Fleet.pointer[0];
+    j = Fleet.pointer[1];
+    if(Fleet.battleGround[i][j]<CL_EMPTY) {
+    cout << "break on 487";
+        return false;
+    } else {
+    cout << "move";
+        return true;
+    }
+}
+
+bool returnPointerToDetectPoint(s_fleet & Fleet, s_pc_memory & pcMemory){
+
+    Fleet.pointer[0] = pcMemory.detectPoint[0];
+    Fleet.pointer[1] = pcMemory.detectPoint[1];
+
+}
+
+bool PCShoot(s_fleet & Fleet, s_pc_memory & pcMemory){
+    int i, j;
+    bool shipShoted, pointerMoved;
+    short shipsAllive = Fleet.shipsAllive;
+    e_shot_direction shotDirectionsList [4] = {NORTH, SOUTH, EAST, WEST};
+
+    if(pcMemory.shipDetected == false){
+
+        do{
+            i = rand()%10;
+            j = rand()%10;
+        } while(Fleet.battleGround[i][j]<CL_EMPTY);
+
+        Fleet.pointer[0] = i;
+        Fleet.pointer[1] = j;
+
+    } else {
+
+        if(pcMemory.direction==UNKNOWN) {
+            do{
+                returnPointerToDetectPoint(Fleet, pcMemory);
+                pcMemory.tempDirection = shotDirectionsList[rand()%4];
+                pointerMoved = PCMovePointer(Fleet, pcMemory.tempDirection);
+                i = Fleet.pointer[0];
+                j = Fleet.pointer[1];
+    //            cout << "[" << pcMemory.detectPoint[0]+1 << ":" << pcMemory.detectPoint[1]+1<< "] ";
+  //              cout << "[" << i+1 << ":" << j+1 << "] " << Fleet.battleGround[i][j] << "<" << CL_EMPTY <<endl;
+//                cout <<"moved=" << pointerMoved <<endl;
+      //          mygetch();
+            } while(pointerMoved!=true);
+        } else {
+            pointerMoved = PCMovePointer(Fleet, pcMemory.direction);
+            if(pointerMoved==false){
+
+                returnPointerToDetectPoint(Fleet, pcMemory);
+                inverseDirection(pcMemory.direction);
+                PCMovePointer(Fleet, pcMemory.direction);
+            }
+        }
+    }
+//i = Fleet.pointer[0];
+  //              j = Fleet.pointer[1];
+//                cout <<"Shot to " << "[" << i+1 << ":" << j+1 << "] " << endl;
+    shipShoted = shot(Fleet);
+
+    if(shipsAllive != Fleet.shipsAllive){
+        pcMemory.shipDetected = false;
+        pcMemory.direction = UNKNOWN;
+    } else if(shipShoted == true) {
+        if(pcMemory.shipDetected == false) {
+            pcMemory.shipDetected = true;
+            pcMemory.detectPoint[0] = i;
+            pcMemory.detectPoint[1] = j;
+        } else if(pcMemory.shipDetected == true && pcMemory.direction==UNKNOWN) {
+            pcMemory.direction = pcMemory.tempDirection;
+        }
+    } else if(shipShoted == false) {
+        if(pcMemory.shipDetected == true) {
+            returnPointerToDetectPoint(Fleet, pcMemory);
+            inverseDirection(pcMemory.direction);
+            PCMovePointer(Fleet, pcMemory.direction);
+        }
+    }
+    //mygetch();
+    return shipShoted;
+}
+
 void printControls(e_game_stage stage){
     cout << endl << "esc - to exit";
     if(stage==BG_CONFIRM){
@@ -432,37 +581,57 @@ void printControls(e_game_stage stage){
     cout << endl << "space - to action";
 }
 
+void changeShooter(e_shooters & currentShooter){
+     currentShooter = (currentShooter==SHOTER_HUMAN) ? SHOTER_PC : SHOTER_HUMAN;
+}
+
 int main(){
     srand(time(NULL));
     system("clear");
 
     int battlegroundSize = 10;
     int action;
-    bool shipsInspector;
-    char * whoWins;
+    short shipsAllive;
+    bool shotSucces;
+    char whoWins[255];
+
     s_fleet myFleet, PCFleet;
     e_game_stage stage = BG_SELECTION;
+    e_shooters currentShooter;
 
     myFleet = initFleet(battlegroundSize);
 
     do {
         system("clear");
 
-        printButtleground(battlegroundSize, myFleet, stage);
+        cout << "Shooter " << currentShooter<<endl;
 
-        shipsInspector = inspectFleet(myFleet.ships, stage);
-        if(shipsInspector==false) {
-            whoWins = "PC";
+        printButtleground(myFleet, stage);
+
+        shipsAllive = inspectFleet(myFleet.ships, stage);
+        if(shipsAllive==0) {
+            strcpy(whoWins, "PC");
         }
 
-        if(stage == BG_SHOTING) {
-            printButtleground(battlegroundSize, PCFleet, stage);
-            shipsInspector = inspectFleet(PCFleet.ships, stage);
-            if(shipsInspector==false) {
-                whoWins = "HUMAN";
+        if(stage == BG_SHOTING || stage == BG_END_GAME) {
+            printButtleground(PCFleet, stage);
+            shipsAllive = inspectFleet(PCFleet.ships, stage);
+            if(shipsAllive==0) {
+                strcpy(whoWins, "HUMAN");
             }
-            //            printButtleground(battlegroundSize, PCFleet, stage, true);
+            //            printButtleground(PCFleet, stage, true);
 
+        }
+        if(stage == BG_END_GAME) {
+            cout << "END GAME " << whoWins << " WINS!" << endl;
+        } else  if(currentShooter == SHOTER_PC) {
+
+            shotSucces = PCShoot(myFleet, pcMemory);
+//            if(shotSucces == false) {
+//                changeShooter(currentShooter);
+//            }
+            usleep(500000);
+            continue;
         }
 
         printControls(stage);
@@ -475,18 +644,19 @@ int main(){
                     stage = BG_SHOTING;
                     myFleet.pointer[0]=myFleet.pointer[1]=-1;
                     PCFleet = initFleet(battlegroundSize);
-                    while (setShip(PCFleet, battlegroundSize, stage, true, false));
+                    while (setShip(PCFleet, stage, true, false));
+                    currentShooter = SHOTER_HUMAN;
+                    pcMemory.detectPoint = new short [2];
+                    pcMemory.shipDetected = false;
+                    pcMemory.direction = UNKNOWN;
                     break;
                 case A_NO:
                     stage = BG_SELECTION;
-                    craftFleet(myFleet, battlegroundSize);
+                    craftFleet(myFleet);
                     break;
                 default:
                     continue;
             }
-        }
-        if(stage == BG_END_GAME) {
-            cout << "END GAME " << whoWins << " WINS!" << endl;
         }
         switch (action) {
             case A_UP:
@@ -498,31 +668,34 @@ int main(){
                         movePointer(PCFleet.pointer, action, battlegroundSize);
                         break;
                     case BG_SELECTION:
-                        moveShip(myFleet, action, battlegroundSize);
+                        moveShip(myFleet, action);
                         break;
                 }
                 break;
             case A_AUTOLOCATE:
                 switch (stage) {
                     case BG_SELECTION:
-                        setShip(myFleet, battlegroundSize, stage, true);
+                        setShip(myFleet, stage, true);
                         break;
                 }
                 break;
             case A_DO:
                 switch (stage) {
                     case BG_SHOTING:
-                        shot(PCFleet);
+                        shotSucces = shot(PCFleet);
+                        if(shotSucces == false) {
+                            changeShooter(currentShooter);
+                        }
                         break;
                     case BG_SELECTION:
-                        setShip(myFleet, battlegroundSize, stage);
+                        setShip(myFleet, stage);
                         break;
                 }
                 break;
             case A_TURN:
                 switch (stage) {
                     case BG_SELECTION:
-                        turnShip(myFleet, battlegroundSize);
+                        turnShip(myFleet);
                         break;
                 }
                 break;
