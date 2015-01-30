@@ -851,6 +851,19 @@ void changeShooter(e_shooters & currentShooter){
      currentShooter = (currentShooter==SHOTER_HUMAN) ? SHOTER_PC : SHOTER_HUMAN;
 }
 
+void destroyFleet(s_fleet & Fleet) {
+    delete [] Fleet.ships;
+
+    for (int i = 0; i<Fleet.battlegroundSize; i++) {
+        delete [] Fleet.battleGround[i];
+    }
+    delete [] Fleet.battleGround;
+}
+
+void destroyPCMemory(s_pc_memory & pcMemory) {
+    delete [] pcMemory.detectPoint;
+}
+
 int main(){
     /*
         randomizer
@@ -868,6 +881,9 @@ int main(){
     short action;
     short shipsAllive;
     bool shotSucces;
+
+    bool fleetInitialised[2] = {false, false};
+    bool pcMemoryInitialised = false;
     /*
         hide the ships
     */
@@ -879,6 +895,8 @@ int main(){
     e_shooters currentShooter;
 
     myFleet = initFleet(battlegroundSize);
+
+    fleetInitialised[0] = true;
 
     do {
         /*
@@ -955,11 +973,13 @@ int main(){
                     stage = BG_SHOTING;
                     myFleet.pointer[0]=myFleet.pointer[1]=-1;
                     PCFleet = initFleet(battlegroundSize);
+                    fleetInitialised[1] = true;
                     while (setShip(PCFleet, stage, true, false));
                     currentShooter = SHOTER_HUMAN;
                     pcMemory.detectPoint = new short [2];
                     pcMemory.shipDetected = false;
                     pcMemory.direction = UNKNOWN;
+                    pcMemoryInitialised = true;
                     break;
                 case A_NO:
                     /*
@@ -1034,6 +1054,18 @@ int main(){
         }
 
     } while (action!=A_EXIT);
+
+    if(fleetInitialised[0] == false){
+        destroyFleet(myFleet);
+    }
+
+    if(fleetInitialised[1] == false){
+        destroyFleet(PCFleet);
+    }
+
+    if(pcMemoryInitialised == false){
+        destroyPCMemory(pcMemory);
+    }
 
     cout << endl << "Press any key to exit..." << endl;
     /*
